@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <title>Manage Students</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <style>
+        body {
+            background-image: url('../static/assets/nec_background_img.jpeg');
+            background-size: cover;
+            background-position: center;
+            font-family: Arial, sans-serif;
+        }
+
+        .container {
+            padding-top: 50px;
+            background-color: rgba(255, 255, 255, 0.7);
+            border-radius: 20px;
+            box-shadow: 0px 0px 10px 0px rgba(0, 0, 0, 0.1);
+        }
+
+        .card {
+            margin-top: 30px;
+            border-radius: 20px;
+        }
+
+        .card-body {
+            padding: 20px;
+        }
+
+        .form-control {
+            border-radius: 20px;
+            justify-content: center;
+            height: 45px;
+            
+        }
+
+        .btn {
+            border-radius: 20px;
+            width: 100%;
+        }
+
+        h1 {
+            color: #007bff;
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 30px;
+            margin-top: 30px;
+        }
+
+        h2 {
+            color: #007bff;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+        .form-control::-webkit-file-upload-button{
+            border-radius: 50px;
+            padding: 8px 16px;
+            background-color: #007bff;
+            border: 0;
+            color: white;
+            font-weight: 200;
+        }
+        .form-control::-webkit-file-upload-button:hover{
+            background-color: darkblue;
+            transition: 0.5s;
+        }
+        #file{
+            padding: 2px;
+            justify-content: center;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    {% for message in get_flashed_messages() %}
+        <div class="alert alert-warning alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+    {% endfor %}
+    <div class="container">
+        <h1>Manage Student</h1>
+
+        <div class="row justify-content-center">
+            <div class="col-md-6">
+                <div class="card shadow">
+                    <div class="card-body">
+                        <form method="post" class="mb-3">
+                            <div class="mb-3">
+                                <label for="regno" class="form-label">RegNo</label>
+                                <input type="text" class="form-control" id="regno" name="regno">
+                            </div>
+                            <button type="submit" class="btn btn-danger" name="remove">Remove</button>
+                        </form>
+                    </div>
+                </div>
+            </div>  
+        </div>
+        
+        <h1>Add Students</h1>
+        <div class="row justify-content-center">
+            <div class="col-md-6">
+                <div class="card shadow">
+                    <div class="card-body">
+                        <h2>Upload File</h2>
+                        <form method="POST" enctype="multipart/form-data">
+                            <div class="mb-3">
+                                <input type="file" class="form-control custom-file" name="file" id="file">
+                            </div>
+                            <button type="submit" class="btn btn-primary">Upload</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- New Form for Changing RegNo -->
+        <div class="row justify-content-center">
+            <div class="col-md-6">
+                <div class="card shadow">
+                    <div class="card-body">
+                        <h2>Change Registration Number</h2>
+                        <form method="post">
+                            <div class="mb-3">
+                                <label for="regnoFrom" class="form-label">RegNo From</label>
+                                <input type="text" class="form-control" id="regnoFrom" name="regnoFrom">
+                            </div>
+                            <div class="mb-3">
+                                <label for="regnoTo" class="form-label">RegNo To</label>
+                                <input type="text" class="form-control" id="regnoTo" name="regnoTo">
+                            </div>
+                            <div class="mb-3">
+                                <label for="changeOption" class="form-label">Select Change Option</label>
+                                <select class="form-control" id="changeOption" name="changeOption">
+                                    {% for tutor in tutors %}
+                                        <option value="{{ tutor }}">{{ tutor }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Change</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

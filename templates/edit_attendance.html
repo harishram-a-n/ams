@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Edit Attendance</title>
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+  <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.10.2/dist/umd/popper.min.js"></script>
+  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+  <style>
+    /* Custom button style */
+    .btn-danger {
+      background-color: #007bff;
+      border-color: #007bff;
+      color: #fff;
+      border-radius: 8px;
+      transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+    }
+
+    .btn-danger:hover {
+      background-color: #0056b3;
+      border-color: #0056b3;
+      color: #fff;
+    }
+
+    /* Custom form style */
+    .container {
+      position: relative;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    .form-control {
+      border-radius: 8px;
+    }
+
+    .form-label {
+      font-weight: bold;
+    }
+
+    .form-box {
+      max-width: 400px;
+      width: 100%;
+      padding: 20px;
+      background-color: rgba(255, 255, 255, 0.8);
+      border-radius: 10px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      animation: slide-in 0.5s ease;
+    }
+
+    .form-title {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      background-image: url('../static/assets/nec_background_img.jpeg');
+      background-size: cover;
+      background-position: center;
+    }
+
+    @media (max-width: 576px) {
+      .form-box {
+        max-width: 90%;
+        padding: 10px;
+      }
+    }
+
+    @keyframes slide-in {
+      from {
+        transform: translateY(-50px);
+        opacity: 0;
+      }
+      to {
+        transform: translateY(0);
+        opacity: 1;
+      }
+    }
+  </style>
+</head>
+<body>
+  {% for message in get_flashed_messages() %}
+        <div class="alert alert-warning alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+    {% endfor %}
+  <div class="container">
+    <div class="col-md-6">
+      <div class="form-box">
+        <h2 class="form-title">Delete Data</h2>
+        <form method="post">
+          <div class="form-group">
+            <label for="dateInput" class="form-label">Date</label>
+            <input type="date" class="form-control" id="dateInput" name="date">
+          </div>
+          <div class="form-group">
+            <label for="regNoInput" class="form-label">Registration Number</label>
+            <input type="text" class="form-control" id="regNoInput" name="regNo" placeholder="Enter registration number">
+          </div>
+          <button type="button" class="btn btn-danger" onclick="confirmDelete('student')">Confirm</button>
+        </form>
+      </div>
+    </div>
+  </div>
+  <script>
+    function confirmDelete(recordsType) {
+      var action = (recordsType === 'attendance') ? 'attendance records' : 'student records';
+      if (confirm("Are you sure you want to delete " + action + "?")) {
+        alert("Data removed successfully!");
+      }
+    }
+  </script>
+</body>
+</html>
