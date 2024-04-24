@@ -1,39 +1,29 @@
 #om
 from flask import Flask, render_template, request, redirect, url_for,send_file,session,flash
 from werkzeug.security import generate_password_hash,check_password_hash
-import datetime,os,zipfile,psycopg2
+import mysql.connector, datetime,os,zipfile
 from datetime import timedelta
 import pandas as pd
-# openpyxl included
+# pip install openpyxl
 
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("FLASK_KEY")
-conn_string = os.environ.get("DB_URI")
-def connect():
-    try:
-        conn = psycopg2.connect(conn_string)
-        return conn
-    except:
-        conn.close()
-        return None
+app.secret_key = "nec_science_and_humanities_year-1"
 
 @app.route('/', methods=["POST", "GET"])
 def home():
     return redirect(url_for('login'))
-    
+
 @app.route('/login', methods=["POST", "GET"])
 def login():
     if request.method == "POST":
         data = (request.form["username"], request.form["password"])
-        mydb = connect()
-        if mydb is None:
-            flash("Connection error")
-            return render_template('index.html')
+        mydb = mysql.connector.connect(host="harishram2k6.mysql.pythonanywhere-services.com", user="harishram2k6", password="qazxsW#123", database='harishram2k6$attendance',
+auth_plugin='mysql_native_password')
         cursor = mydb.cursor()
         command = "SELECT PASSWORD FROM login_data WHERE USERNAME=%s"
         cursor.execute(command, (data[0],))
-        database_data = list(map(lambda x: tuple([i.strip() if isinstance(i,str) else i for i in x]),cursor.fetchall()))
+        database_data = cursor.fetchall()
         mydb.close()
         if any(database_data):
             if not check_password_hash(database_data[0][0],data[1]):
@@ -54,14 +44,10 @@ def login():
 def manage_student():
     if not("admin_valid" in session):
         return redirect(url_for('login'))
-    mydb = connect()
-    if mydb is None:
-        flash("Connection error")
-        return url_for('login')
+    mydb = mysql.connector.connect(host="harishram2k6.mysql.pythonanywhere-services.com", user="harishram2k6", password="qazxsW#123", database='harishram2k6$attendance',auth_plugin='mysql_native_password')
     cursor = mydb.cursor()
     cursor.execute('SELECT username FROM login_data')
-    tutor_uids = list(map(lambda x: tuple([i.strip() if isinstance(i,str) else i for i in x]),cursor.fetchall()))
-    tutor_uids = list(map(lambda x:x[0],tutor_uids))
+    tutor_uids = list(map(lambda x:x[0],cursor.fetchall()))
     tutor_uids.remove("admin")
     mydb.close()
     if request.method=='POST':
@@ -82,10 +68,7 @@ def manage_student():
                         elif ('name' in topic) and ('student' in topic):
                             heading['name']=i
                     data = tuple(zip(df[heading['name']],df[heading['regno']],df[heading['tutor']]))
-                    mydb = connect()
-                    if mydb is None:
-                        flash("Connection error")
-                        return render_template('man_stu.html',tutors=tutor_uids)
+                    mydb = mysql.connector.connect(host="harishram2k6.mysql.pythonanywhere-services.com", user="harishram2k6", password="qazxsW#123", database='harishram2k6$attendance',auth_plugin='mysql_native_password')
                     cursor = mydb.cursor()
                     section = file.filename.split('.')[0].replace(" ",'_')
                     dept = file.filename.split()[0] if " " in file.filename else file.filename.split('.')[0]
@@ -141,10 +124,7 @@ def manage_student():
             got = request.form['regno'].strip()
             try:
                 regno = int(got)
-                mydb = connect()
-                if mydb is None:
-                    flash("Connection error")
-                    return render_template('man_stu.html',tutors=tutor_uids)
+                mydb = mysql.connector.connect(host="harishram2k6.mysql.pythonanywhere-services.com", user="harishram2k6", password="qazxsW#123", database='harishram2k6$attendance',auth_plugin='mysql_native_password')
                 cursor = mydb.cursor()
                 cursor.execute("DELETE FROM tutor where regno=%s",(regno,))
                 flash(f"{regno} removed successfully!")
@@ -160,10 +140,7 @@ def manage_student():
             tutor_id = request.form.get('changeOption')
             if any(reg_start) and any(reg_end) and any(tutor_id):
                 try:
-                    mydb = connect()
-                    if mydb is None:
-                        flash("Connection error")
-                        return render_template("man_stu.html",tutors=tutor_uids)
+                    mydb = mysql.connector.connect(host="harishram2k6.mysql.pythonanywhere-services.com", user="harishram2k6", password="qazxsW#123", database='harishram2k6$attendance',auth_plugin='mysql_native_password')
                     cursor = mydb.cursor()
                     cursor.execute("UPDATE tutor SET tutor_uid=%s WHERE regno BETWEEN %s AND %s",(tutor_id,int(reg_start),int(reg_end)))
                     mydb.commit()
@@ -181,16 +158,13 @@ def man_attendance():
         return redirect(url_for('login'))
     if request.method=="POST" and 'regNo' in request.form:
         try:
-            mydb = connect()
-            if mydb is None:
-                flash("Connection error")
-                return render_template("edit_attendance.html")
+            mydb = mysql.connector.connect(host="harishram2k6.mysql.pythonanywhere-services.com", user="harishram2k6", password="qazxsW#123", database='harishram2k6$attendance',auth_plugin='mysql_native_password')
             data = (int(request.form.get('regNo')), request.form.get('date'))
             cursor = mydb.cursor()
             cursor.execute("DELETE FROM admin WHERE regno=%s AND date=%s",data)
             mydb.commit()
         except:
-            flash("Error occured!")
+            pass
         finally:
             mydb.close()
             return render_template("edit_attendance.html")
@@ -202,10 +176,7 @@ def man_database():
         return redirect(url_for('login'))
     if request.method=="POST" and any(list(request.form)):
         try:
-            mydb = connect()
-            if mydb is None:
-                flash("Connection error")
-                return render_template("drop_data.html")
+            mydb = mysql.connector.connect(host="harishram2k6.mysql.pythonanywhere-services.com", user="harishram2k6", password="qazxsW#123", database='harishram2k6$attendance',auth_plugin='mysql_native_password')
             cursor = mydb.cursor()
             if tuple(request.form)[0]=='student':
                 cursor.execute("truncate tutor")
@@ -226,13 +197,10 @@ def submit_form():
     if not("admin_valid" in session):
         return redirect(url_for('login'))
     def db_data():
-        mydb = connect()
-        if mydb is None:
-            flash("Connection error")
-            return url_for('login')
+        mydb = mysql.connector.connect(host="harishram2k6.mysql.pythonanywhere-services.com", user="harishram2k6", password="qazxsW#123", database='harishram2k6$attendance',auth_plugin='mysql_native_password')
         cursor = mydb.cursor()
         cursor.execute("SELECT username,subject FROM login_data ORDER BY subject")
-        data = list(map(lambda x: tuple([i.strip() if isinstance(i,str) else i for i in x]),cursor.fetchall()))
+        data = cursor.fetchall()
         for i in range(len(data)):
             if data[i][0]=='admin':
                 data.pop(i)
@@ -242,10 +210,7 @@ def submit_form():
     data = db_data()
     if request.method=="POST" and any(list(request.form)):
         try:
-            mydb = connect()
-            if mydb is None:
-                flash("Connection error")
-                return url_for('login')
+            mydb = mysql.connector.connect(host="harishram2k6.mysql.pythonanywhere-services.com", user="harishram2k6", password="qazxsW#123", database='harishram2k6$attendance',auth_plugin='mysql_native_password')
             cursor = mydb.cursor()
             cursor.execute("DELETE FROM login_data WHERE username=%s",tuple(request.form))
             mydb.commit()
@@ -262,13 +227,10 @@ def tutor_add():
     if not("admin_valid" in session):
         return redirect(url_for('login'))
     if request.method=='POST':
-        mydb = connect()
-        if mydb is None:
-            flash("Connection error")
-            return render_template("add_tutor.html")
+        mydb = mysql.connector.connect(host="harishram2k6.mysql.pythonanywhere-services.com", user="harishram2k6", password="qazxsW#123", database='harishram2k6$attendance',auth_plugin='mysql_native_password')
         cursor = mydb.cursor()
         cursor.execute("SELECT username FROM login_data")
-        u_name = list(map(lambda x: tuple([i.strip() if isinstance(i,str) else i for i in x]),cursor.fetchall()))
+        u_name = cursor.fetchall()
         u_name = tuple(map(lambda x:x[0],u_name))
         mydb.close()
         data = (request.form["username"].strip().lower(), request.form["password"],request.form["subject"])
@@ -279,10 +241,7 @@ def tutor_add():
             flash("data incomplete!")
             return render_template("add_tutor.html")
         else:
-            mydb = connect()
-            if mydb is None:
-                flash("Connection error")
-                return render_template("add_tutor.html")
+            mydb = mysql.connector.connect(host="harishram2k6.mysql.pythonanywhere-services.com", user="harishram2k6", password="qazxsW#123", database='harishram2k6$attendance',auth_plugin='mysql_native_password')
             cursor = mydb.cursor()
             data = list(data)
             data[1]=generate_password_hash(data[1],method='pbkdf2:sha256',salt_length=8)
@@ -297,51 +256,49 @@ def tutor_add():
 def admin():
     if not("admin_valid" in session):
         return redirect(url_for('login'))
-    all_files = os.listdir(os.getcwd())
-    csv_files = [file for file in all_files if file.endswith('.csv')] 
-    for i in csv_files:
-        os.remove(i)
-    if ("department.zip" in all_files):
-        os.remove("department.zip")
+    for i in os.listdir("/home/harishram2k6/mysite"):
+        if '.csv' in i or '.zip' in i:
+            os.remove("/home/harishram2k6/mysite/"+i)
     if request.method=="POST" and ('submit' in request.form):
         data = (request.form["startDate"], request.form["endDate"])
         if not(any(data[0])) or not(any(data[0])):
             return render_template('admin.html',js_code="Date not selected")
-        mydb = connect()
-        if mydb is None:   
-            flash("Connection error")
-            return render_template('admin.html')
+        mydb = mysql.connector.connect(host="harishram2k6.mysql.pythonanywhere-services.com", user="harishram2k6", password="qazxsW#123", database='harishram2k6$attendance',
+        auth_plugin='mysql_native_password')
         cursor = mydb.cursor()
         command = "select regno,name,reason,date from admin where date between %s and %s order by sec"
         cursor.execute(command, data)
-        data = list(map(lambda x: tuple([i.strip() if isinstance(i,str) else i for i in x]),cursor.fetchall()))
+        data = cursor.fetchall()
         mydb.close()
         return render_template('admin.html', data=data)
     elif request.method=="POST" and ('download' in request.form):
         data = (request.form["startDate"],request.form["endDate"])
         if not(any(data[0])) or not(any(data[0])):
-            return render_template('admin.html',js_code="Date not selected")
-        mydb = connect()
-        if mydb is None:
-            flash("Connection error")
+            flash("Date not selected")
             return render_template('admin.html')
+        mydb = mysql.connector.connect(host="harishram2k6.mysql.pythonanywhere-services.com",user="harishram2k6",password="qazxsW#123",database = 'harishram2k6$attendance',auth_plugin='mysql_native_password')
         cursor = mydb.cursor()
         command = "select regno,name,reason,date,sec from admin where date between %s and %s order by sec"
         cursor.execute(command,data)
-        data = list(map(lambda x: tuple([i.strip() if isinstance(i,str) else i for i in x]),cursor.fetchall()))
+        data = cursor.fetchall()
         mydb.close()
-        regno, name, reason, date, student_sec = zip(*[(i[0], i[1], i[2], i[3].strftime("%Y-%m-%d"),i[4]) for i in data])
+        try:
+            regno, name, reason, date, student_sec = zip(*[(i[0], i[1], i[2], i[3].strftime("%Y-%m-%d"),i[4]) for i in data])
+        except:
+            flash("No data available within the given date range")
+            return render_template('admin.html')
         df_data = {"REGNO":regno,"SECTION":student_sec,"NAME":name,"REASON":reason,"DATE":date}
         df = pd.DataFrame(df_data)
-        df.to_csv('data.csv', index=False)
-        with open("data.csv","r") as file:
+        path = os.path.join(os.path.dirname(__file__), 'data.csv')
+        df.to_csv(path, index=False)
+        with open(path,"r") as file:
             line = file.readlines()
             data = list(map(lambda x:x.strip().split(","),line))
             data.pop(0)
             name = data[0][1]
             files_name = []
-            dep_file = open(name+".csv","w")
-            files_name.append(name+".csv")
+            dep_file = open(os.path.join(os.path.dirname(__file__),name+".csv"),"w")
+            files_name.append(os.path.join(os.path.dirname(__file__),name+".csv"))
             for i in data:
                 if (i[1]==name):
                     line = (",".join(i)+"\n")
@@ -349,23 +306,22 @@ def admin():
                 else:
                     dep_file.close()
                     name = i[1]
-                    dep_file = open(name+".csv","w")
-                    files_name.append(name+".csv")
+                    dep_file = open(os.path.join(os.path.dirname(__file__),name+".csv"),"w")
+                    files_name.append(os.path.join(os.path.dirname(__file__),name+".csv"))
                     line = (",".join(i)+"\n")
                     dep_file.write(line)
             dep_file.close()
-            with zipfile.ZipFile('department.zip', 'w') as zipf:
+            f_name = os.path.join(os.path.dirname(__file__),'department.zip')
+            with zipfile.ZipFile(f_name, 'w') as zipf:
                 for file in files_name:
                     zipf.write(file)
-        os.remove("data.csv")
-        return send_file('department.zip', as_attachment=True)
+        os.remove(path)
+        return send_file(f_name, as_attachment=True)
     elif request.method=="POST" and ('monthly-report-download' in request.form):
-        mydb = connect()
-        if mydb is None:
-            flash("Connection error")
-            return render_template('admin.html')
+        mydb = mysql.connector.connect(host="harishram2k6.mysql.pythonanywhere-services.com", user="harishram2k6", password="qazxsW#123", database='harishram2k6$attendance',auth_plugin='mysql_native_password')
         cursor = mydb.cursor()
-        with open("holidays.txt","r") as file:
+        hol_path = os.path.join(os.path.dirname(__file__), 'holidays.txt')
+        with open(hol_path,"r") as file:
             holidays = tuple(map(lambda x:x.strip(),file.readlines()))
         def get_dates_current_month():
             today = datetime.date.today()
@@ -382,9 +338,10 @@ def admin():
         c_name = get_dates_current_month()
         line = ""
         cursor.execute("SELECT NAME,REGNO FROM tutor")
-        name_regno = list(map(lambda x: tuple([i.strip() if isinstance(i,str) else i for i in x]),cursor.fetchall()))
+        name_regno = cursor.fetchall()
         total_working_hours = len(c_name)*8
-        with open("month_data.txt","w") as file:
+        f_path = os.path.join(os.path.dirname(__file__), 'month_data.txt')
+        with open(f_path,"w") as file:
             file.write(column_name+"\n")
             for i in name_regno:
                 name = i[0]
@@ -392,7 +349,7 @@ def admin():
                 line+=(i[0]+','+str(i[1]))
                 date = datetime.date.today()
                 cursor.execute("SELECT date from admin where regno=%s and date between %s and %s",(regno,str(date.replace(day=1)),str(date)))
-                leave_date = list(map(lambda x: tuple([i.strip() if isinstance(i,str) else i for i in x]),cursor.fetchall()))
+                leave_date = cursor.fetchall()
                 leave_date = [str(item[0]) for item in leave_date]
                 for i in range(len(c_name)):
                     if (c_name[i] in leave_date):
@@ -403,8 +360,11 @@ def admin():
                 file.write(line+'\n')
                 line=''
         mydb.close()
-        os.rename("month_data.txt","month_data.csv")
-        return send_file("month_data.csv",as_attachment=True)
+        os.rename(f_path,f_path.replace("txt","csv"))
+        if os.path.exists(f_path.replace('txt','csv')):
+            return send_file(f_path.replace('txt','csv'), as_attachment=True)
+        else:
+            return "Error: month_data.txt not found", 404
     else:
         return render_template("admin.html")
 
@@ -413,21 +373,17 @@ def admin():
 def tutor(uid):
     if not("valid" in session):
         return redirect(url_for('login'))
-    mydb = connect()
-    if mydb is None:
-        flash("Connection error")
-        return url_for('login')
+    mydb = mysql.connector.connect(host="harishram2k6.mysql.pythonanywhere-services.com", user="harishram2k6", password="qazxsW#123", database='harishram2k6$attendance',
+    auth_plugin='mysql_native_password')
     cursor = mydb.cursor()
     cursor.execute("SELECT DISTINCT SEC FROM tutor WHERE TUTOR_UID=%s",(uid,))
-    tutor_sec = (cursor.fetchone())[0].strip()
+    tutor_sec = (cursor.fetchone())[0]
     cursor.execute("SELECT NAME,REGNO,DEPARTMENT,SEC FROM tutor WHERE SEC=%s", (tutor_sec,))
-    data = list(map(lambda x: tuple([i.strip() if isinstance(i,str) else i for i in x]),cursor.fetchall()))
+    data = cursor.fetchall()
     mydb.close()
     if request.method == "POST":
-        mydb = connect()
-        if mydb is None:
-            flash("Connection error")
-            return url_for('login')
+        mydb = mysql.connector.connect(host="harishram2k6.mysql.pythonanywhere-services.com", user="harishram2k6", password="qazxsW#123", database='harishram2k6$attendance',
+        auth_plugin='mysql_native_password')
         cursor = mydb.cursor()
         selected_checkboxes = request.form.getlist('checkbox')
         # selected_checkboxes --> ['0','1']
