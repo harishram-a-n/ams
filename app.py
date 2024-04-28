@@ -33,7 +33,7 @@ auth_plugin='mysql_native_password')
                 session["admin_valid"] = True
                 return redirect(url_for('admin'))
             else:
-                session["valid"] = True
+                session[data[0]] = True
                 return redirect(url_for('tutor', uid=data[0]))
         else:
             flash("User not found")
@@ -58,8 +58,8 @@ def manage_student():
                 return render_template('man_stu.html',tutors=tutor_uids)
             if 'xlsx' in file.filename:
                 try:
-                    file.save(os.path.join(os.getcwd(),file.filename))
-                    df = pd.read_excel(file.filename)
+                    file.save("/home/harishram2k6/mysite/"+file.filename)
+                    df = pd.read_excel("/home/harishram2k6/mysite/"+file.filename)
                     heading = {'regno':None,'name':None,'tutor':None}
                     for i in tuple(df):
                         topic = i.strip().replace('.','').lower()
@@ -82,16 +82,16 @@ def manage_student():
                         mydb.commit()
                 except:
                     mydb.close()
-                    os.remove(os.path.join(os.getcwd(), file.filename))
+                    os.remove("/home/harishram2k6/mysite/"+file.filename)
                     flash("Some error occured! check file format")
                     return render_template('man_stu.html',tutors=tutor_uids)
                 finally:
                     mydb.close()
-                    os.remove(os.path.join(os.getcwd(), file.filename))
+                    os.remove("/home/harishram2k6/mysite/"+file.filename)
                     flash("Completed")
                     return render_template('man_stu.html',tutors=tutor_uids)
             elif file.filename.lower()=='holidays.txt':
-                file.save(os.path.join(os.getcwd(), "sample.txt"))
+                file.save("/home/harishram2k6/mysite/"+"sample.txt")
                 try:
                     def is_valid_date(date_str, format='%Y-%m-%d'):
                         try:
@@ -99,14 +99,14 @@ def manage_student():
                             return True
                         except ValueError:
                             return False
-                    with open("sample.txt","r") as f1:
+                    with open("/home/harishram2k6/mysite/sample.txt","r") as f1:
                         dates = f1.readlines()
                         for i in dates:
                             if (not is_valid_date(i)):
-                                os.remove("sample.txt")
+                                os.remove("/home/harishram2k6/mysite/sample.txt")
                                 flash("check date or date format!")
                                 return render_template('man_stu.html',tutors=tutor_uids)
-                        os.rename("sample.txt","holidays.txt")
+                        os.rename("/home/harishram2k6/mysite/sample.txt","/home/harishram2k6/mysite/holidays.txt")
                         flash("Completed !")
                         return render_template('man_stu.html',tutors=tutor_uids)
                 except:
@@ -156,10 +156,21 @@ def manage_student():
 def man_attendance():
     if not("admin_valid" in session):
         return redirect(url_for('login'))
-    if request.method=="POST" and 'regNo' in request.form:
+    f_path = os.path.join(os.path.dirname(__file__), 'status.txt')
+    with open(f_path,"r") as file:
+        status = file.readline().strip()
+    if request.method=='POST' and ('button_clicked' in request.form) and not(('flexSwitchCheckDefault' in request.form)):
+        with open(f_path,"w") as file:
+            pass
+        return render_template("edit_attendance.html",state="")
+    elif request.method=='POST' and ('flexSwitchCheckDefault' in request.form):
+        with open(f_path,"w") as file:
+            file.write("checked")
+        return render_template("edit_attendance.html",state="checked")
+    elif request.method=="POST" and 'regNo' in request.form:
         try:
             mydb = mysql.connector.connect(host="harishram2k6.mysql.pythonanywhere-services.com", user="harishram2k6", password="qazxsW#123", database='harishram2k6$attendance',auth_plugin='mysql_native_password')
-            data = (int(request.form.get('regNo')), request.form.get('date'))
+            data = (int(request.form.get('regNo')),request.form.get('date'))
             cursor = mydb.cursor()
             cursor.execute("DELETE FROM admin WHERE regno=%s AND date=%s",data)
             mydb.commit()
@@ -167,8 +178,8 @@ def man_attendance():
             pass
         finally:
             mydb.close()
-            return render_template("edit_attendance.html")
-    return render_template("edit_attendance.html")
+            return render_template("edit_attendance.html",state=status)
+    return render_template("edit_attendance.html",state=status)
 
 @app.route('/manage/database', methods=['POST','GET'])
 def man_database():
@@ -199,12 +210,8 @@ def submit_form():
     def db_data():
         mydb = mysql.connector.connect(host="harishram2k6.mysql.pythonanywhere-services.com", user="harishram2k6", password="qazxsW#123", database='harishram2k6$attendance',auth_plugin='mysql_native_password')
         cursor = mydb.cursor()
-        cursor.execute("SELECT username,subject FROM login_data ORDER BY subject")
+        cursor.execute("SELECT username,subject FROM login_data where username!='admin' ORDER BY subject")
         data = cursor.fetchall()
-        for i in range(len(data)):
-            if data[i][0]=='admin':
-                data.pop(i)
-                break
         mydb.close()
         return data
     data = db_data()
@@ -257,7 +264,7 @@ def admin():
     if not("admin_valid" in session):
         return redirect(url_for('login'))
     for i in os.listdir("/home/harishram2k6/mysite"):
-        if '.csv' in i or '.zip' in i:
+        if '.csv' in i or '.zip' in i or ".xlsx" in i:
             os.remove("/home/harishram2k6/mysite/"+i)
     if request.method=="POST" and ('submit' in request.form):
         data = (request.form["startDate"], request.form["endDate"])
@@ -371,8 +378,16 @@ def admin():
 
 @app.route('/manage/<uid>', methods=["POST", "GET"])
 def tutor(uid):
-    if not("valid" in session):
+    if not(uid in session):
         return redirect(url_for('login'))
+    with open(os.path.join(os.path.dirname(__file__), 'status.txt'),'r') as status_file:
+        status = status_file.readline()
+    if status:
+        return render_template("closed.html",data="Attendance Closed By Admin")
+    with open(os.path.join(os.path.dirname(__file__), 'holidays.txt'),'r') as file:
+        h_days = tuple(map(lambda x:x.strip(),file.readlines()))
+    if (str(datetime.date.today()) in h_days) or (datetime.date.today().weekday()==6):
+        return render_template("closed.html",data="Site Temporarily Suspended For Holiday")
     mydb = mysql.connector.connect(host="harishram2k6.mysql.pythonanywhere-services.com", user="harishram2k6", password="qazxsW#123", database='harishram2k6$attendance',
     auth_plugin='mysql_native_password')
     cursor = mydb.cursor()
