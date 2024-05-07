@@ -1,14 +1,25 @@
 #om
 from flask import Flask, render_template, request, redirect, url_for,send_file,session,flash
 from werkzeug.security import generate_password_hash,check_password_hash
-import mysql.connector, datetime,os,zipfile
+import mysql.connector, datetime,os,zipfile,smtplib,random
 from datetime import timedelta
 import pandas as pd
-# pip install openpyxl
+# openpyxl imcluded
 
 
 app = Flask(__name__)
 app.secret_key = "nec_science_and_humanities_year-1"
+
+def sendmail(to_address,otp):
+    my_email = "harishram2706@gmail.com"
+    password = "abrq pvfa jzvc bggb "
+    with smtplib.SMTP("smtp.gmail.com",port=587) as connection:
+        connection.starttls()
+        connection.login(user=my_email, password=password)
+        connection.sendmail(
+        from_addr=my_email,
+        to_addrs=to_address,
+        msg=f"Subject: AMS\n\nYour OTP is: {otp}")
 
 @app.route('/', methods=["POST", "GET"])
 def home():
@@ -18,8 +29,7 @@ def home():
 def login():
     if request.method == "POST":
         data = (request.form["username"], request.form["password"])
-        mydb = mysql.connector.connect(host="harishram2k6.mysql.pythonanywhere-services.com", user="harishram2k6", password="qazxsW#123", database='harishram2k6$attendance',
-auth_plugin='mysql_native_password')
+        mydb = mysql.connector.connect(host="necscienceandhumanities.mysql.pythonanywhere-services.com", user="necscienceandhum", password="qazxsW#123", database='necscienceandhum$default',auth_plugin='mysql_native_password')
         cursor = mydb.cursor()
         command = "SELECT PASSWORD FROM login_data WHERE USERNAME=%s"
         cursor.execute(command, (data[0],))
@@ -44,7 +54,7 @@ auth_plugin='mysql_native_password')
 def manage_student():
     if not("admin_valid" in session):
         return redirect(url_for('login'))
-    mydb = mysql.connector.connect(host="harishram2k6.mysql.pythonanywhere-services.com", user="harishram2k6", password="qazxsW#123", database='harishram2k6$attendance',auth_plugin='mysql_native_password')
+    mydb = mysql.connector.connect(host="necscienceandhumanities.mysql.pythonanywhere-services.com", user="necscienceandhum", password="qazxsW#123", database='necscienceandhum$default',auth_plugin='mysql_native_password')
     cursor = mydb.cursor()
     cursor.execute('SELECT username FROM login_data')
     tutor_uids = list(map(lambda x:x[0],cursor.fetchall()))
@@ -58,8 +68,8 @@ def manage_student():
                 return render_template('man_stu.html',tutors=tutor_uids)
             if 'xlsx' in file.filename:
                 try:
-                    file.save("/home/harishram2k6/mysite/"+file.filename)
-                    df = pd.read_excel("/home/harishram2k6/mysite/"+file.filename)
+                    file.save(os.path.join(os.path.dirname(__file__), file.filename))
+                    df = pd.read_excel(os.path.join(os.path.dirname(__file__), file.filename))
                     heading = {'regno':None,'name':None,'tutor':None}
                     for i in tuple(df):
                         topic = i.strip().replace('.','').lower()
@@ -68,7 +78,7 @@ def manage_student():
                         elif ('name' in topic) and ('student' in topic):
                             heading['name']=i
                     data = tuple(zip(df[heading['name']],df[heading['regno']],df[heading['tutor']]))
-                    mydb = mysql.connector.connect(host="harishram2k6.mysql.pythonanywhere-services.com", user="harishram2k6", password="qazxsW#123", database='harishram2k6$attendance',auth_plugin='mysql_native_password')
+                    mydb = mysql.connector.connect(host="necscienceandhumanities.mysql.pythonanywhere-services.com", user="necscienceandhum", password="qazxsW#123", database='necscienceandhum$default',auth_plugin='mysql_native_password')
                     cursor = mydb.cursor()
                     section = file.filename.split('.')[0].replace(" ",'_')
                     dept = file.filename.split()[0] if " " in file.filename else file.filename.split('.')[0]
@@ -82,16 +92,16 @@ def manage_student():
                         mydb.commit()
                 except:
                     mydb.close()
-                    os.remove("/home/harishram2k6/mysite/"+file.filename)
+                    os.remove(os.path.join(os.path.dirname(__file__), file.filename))
                     flash("Some error occured! check file format")
                     return render_template('man_stu.html',tutors=tutor_uids)
                 finally:
                     mydb.close()
-                    os.remove("/home/harishram2k6/mysite/"+file.filename)
+                    os.remove(os.path.join(os.path.dirname(__file__), file.filename))
                     flash("Completed")
                     return render_template('man_stu.html',tutors=tutor_uids)
             elif file.filename.lower()=='holidays.txt':
-                file.save("/home/harishram2k6/mysite/"+"sample.txt")
+                file.save(os.path.join(os.path.dirname(__file__), 'sample.txt'))
                 try:
                     def is_valid_date(date_str, format='%Y-%m-%d'):
                         try:
@@ -99,14 +109,14 @@ def manage_student():
                             return True
                         except ValueError:
                             return False
-                    with open("/home/harishram2k6/mysite/sample.txt","r") as f1:
+                    with open(os.path.join(os.path.dirname(__file__), 'sample.txt'),"r") as f1:
                         dates = f1.readlines()
                         for i in dates:
                             if (not is_valid_date(i)):
-                                os.remove("/home/harishram2k6/mysite/sample.txt")
+                                os.remove(os.path.join(os.path.dirname(__file__), 'sample.txt'))
                                 flash("check date or date format!")
                                 return render_template('man_stu.html',tutors=tutor_uids)
-                        os.rename("/home/harishram2k6/mysite/sample.txt","/home/harishram2k6/mysite/holidays.txt")
+                        os.rename(os.path.join(os.path.dirname(__file__), 'sample.txt'),os.path.join(os.path.dirname(__file__), 'holidays.txt'))
                         flash("Completed !")
                         return render_template('man_stu.html',tutors=tutor_uids)
                 except:
@@ -124,7 +134,7 @@ def manage_student():
             got = request.form['regno'].strip()
             try:
                 regno = int(got)
-                mydb = mysql.connector.connect(host="harishram2k6.mysql.pythonanywhere-services.com", user="harishram2k6", password="qazxsW#123", database='harishram2k6$attendance',auth_plugin='mysql_native_password')
+                mydb = mysql.connector.connect(host="necscienceandhumanities.mysql.pythonanywhere-services.com", user="necscienceandhum", password="qazxsW#123", database='necscienceandhum$default',auth_plugin='mysql_native_password')
                 cursor = mydb.cursor()
                 cursor.execute("DELETE FROM tutor where regno=%s",(regno,))
                 flash(f"{regno} removed successfully!")
@@ -140,7 +150,7 @@ def manage_student():
             tutor_id = request.form.get('changeOption')
             if any(reg_start) and any(reg_end) and any(tutor_id):
                 try:
-                    mydb = mysql.connector.connect(host="harishram2k6.mysql.pythonanywhere-services.com", user="harishram2k6", password="qazxsW#123", database='harishram2k6$attendance',auth_plugin='mysql_native_password')
+                    mydb = mysql.connector.connect(host="necscienceandhumanities.mysql.pythonanywhere-services.com", user="necscienceandhum", password="qazxsW#123", database='necscienceandhum$default',auth_plugin='mysql_native_password')
                     cursor = mydb.cursor()
                     cursor.execute("UPDATE tutor SET tutor_uid=%s WHERE regno BETWEEN %s AND %s",(tutor_id,int(reg_start),int(reg_end)))
                     mydb.commit()
@@ -169,7 +179,7 @@ def man_attendance():
         return render_template("edit_attendance.html",state="checked")
     elif request.method=="POST" and 'regNo' in request.form:
         try:
-            mydb = mysql.connector.connect(host="harishram2k6.mysql.pythonanywhere-services.com", user="harishram2k6", password="qazxsW#123", database='harishram2k6$attendance',auth_plugin='mysql_native_password')
+            mydb = mysql.connector.connect(host="necscienceandhumanities.mysql.pythonanywhere-services.com", user="necscienceandhum", password="qazxsW#123", database='necscienceandhum$default',auth_plugin='mysql_native_password')
             data = (int(request.form.get('regNo')),request.form.get('date'))
             cursor = mydb.cursor()
             cursor.execute("DELETE FROM admin WHERE regno=%s AND date=%s",data)
@@ -187,7 +197,7 @@ def man_database():
         return redirect(url_for('login'))
     if request.method=="POST" and any(list(request.form)):
         try:
-            mydb = mysql.connector.connect(host="harishram2k6.mysql.pythonanywhere-services.com", user="harishram2k6", password="qazxsW#123", database='harishram2k6$attendance',auth_plugin='mysql_native_password')
+            mydb = mysql.connector.connect(host="necscienceandhumanities.mysql.pythonanywhere-services.com", user="necscienceandhum", password="qazxsW#123", database='necscienceandhum$default',auth_plugin='mysql_native_password')
             cursor = mydb.cursor()
             if tuple(request.form)[0]=='student':
                 cursor.execute("truncate tutor")
@@ -203,12 +213,59 @@ def man_database():
             return render_template("drop_data.html")
     return render_template("drop_data.html")
 
+@app.route("/reset_password/confirm",methods=["POST","GET"])
+def confirm_reset():
+    if not("otp" in session):
+        return redirect(url_for("login"))
+    if (request.method=='POST' and "OTP" in request.form):
+        if (int(request.form.get("OTP").strip())!=session.get("otp")):
+            flash("OTP Invalid!")
+        elif (len(request.form.get("password"))<8):
+            flash("Password must be a minimum of eight characters!")
+        else:
+            mydb = mysql.connector.connect(host="necscienceandhumanities.mysql.pythonanywhere-services.com", user="necscienceandhum", password="qazxsW#123", database='necscienceandhum$default',auth_plugin='mysql_native_password')
+            cursor = mydb.cursor()
+            cursor.execute("UPDATE login_data SET password=%s WHERE username=%s",(generate_password_hash(request.form.get("password"),method='pbkdf2:sha256',salt_length=8),session.get("u_name").replace("resetpasswd","")))
+            mydb.commit()
+            mydb.close()
+            session.clear()
+            flash("Password updated successfully!")
+            return redirect(url_for("login"))
+    return render_template("confirm.html")
+
+@app.route("/reset_password",methods=['POST','GET'])
+def reset_password():
+    if request.method=='POST' and "u_name" in request.form:
+        try:
+            mydb = mysql.connector.connect(host="necscienceandhumanities.mysql.pythonanywhere-services.com", user="necscienceandhum", password="qazxsW#123", database='necscienceandhum$default',auth_plugin='mysql_native_password')
+            cursor = mydb.cursor()
+            cursor.execute("SELECT mail FROM login_data WHERE username=%s",(request.form.get("u_name"),))
+            data = cursor.fetchone()
+            if not(data) or request.form.get("u_name")=='admin':
+                flash("User not found!")
+            else:
+                session["u_name"]=request.form.get("u_name")+"resetpasswd"
+                session["otp"]=random.randint(1000,9999)
+                sendmail(data[0],session.get("otp"))
+                mail = data[0].split('@')
+                mail[0]=(len(mail[0])//2)*"*"+mail[0][len(mail[0])//2:]
+                mail = '@'.join(mail)
+                flash(f"OTP sent to {mail}!")
+                mydb.close()
+                return redirect(url_for("confirm_reset"))
+        except:
+            flash("Error occured!")
+        finally:
+            mydb.close()
+    return render_template("send_otp.html")
+
+
 @app.route('/manage/tutors', methods=['POST','GET'])
 def submit_form():
     if not("admin_valid" in session):
         return redirect(url_for('login'))
     def db_data():
-        mydb = mysql.connector.connect(host="harishram2k6.mysql.pythonanywhere-services.com", user="harishram2k6", password="qazxsW#123", database='harishram2k6$attendance',auth_plugin='mysql_native_password')
+        mydb = mysql.connector.connect(host="necscienceandhumanities.mysql.pythonanywhere-services.com", user="necscienceandhum", password="qazxsW#123", database='necscienceandhum$default',auth_plugin='mysql_native_password')
         cursor = mydb.cursor()
         cursor.execute("SELECT username,subject FROM login_data where username!='admin' ORDER BY subject")
         data = cursor.fetchall()
@@ -217,7 +274,7 @@ def submit_form():
     data = db_data()
     if request.method=="POST" and any(list(request.form)):
         try:
-            mydb = mysql.connector.connect(host="harishram2k6.mysql.pythonanywhere-services.com", user="harishram2k6", password="qazxsW#123", database='harishram2k6$attendance',auth_plugin='mysql_native_password')
+            mydb = mysql.connector.connect(host="necscienceandhumanities.mysql.pythonanywhere-services.com", user="necscienceandhum", password="qazxsW#123", database='necscienceandhum$default',auth_plugin='mysql_native_password')
             cursor = mydb.cursor()
             cursor.execute("DELETE FROM login_data WHERE username=%s",tuple(request.form))
             mydb.commit()
@@ -233,29 +290,48 @@ def submit_form():
 def tutor_add():
     if not("admin_valid" in session):
         return redirect(url_for('login'))
-    if request.method=='POST':
-        mydb = mysql.connector.connect(host="harishram2k6.mysql.pythonanywhere-services.com", user="harishram2k6", password="qazxsW#123", database='harishram2k6$attendance',auth_plugin='mysql_native_password')
+    if request.method=="POST":
+        print(tuple(request.form))
+    if request.method=='POST' and "username" in request.form:
+        mydb = mysql.connector.connect(host="necscienceandhumanities.mysql.pythonanywhere-services.com", user="necscienceandhum", password="qazxsW#123", database='necscienceandhum$default',auth_plugin='mysql_native_password')
         cursor = mydb.cursor()
         cursor.execute("SELECT username FROM login_data")
         u_name = cursor.fetchall()
         u_name = tuple(map(lambda x:x[0],u_name))
         mydb.close()
-        data = (request.form["username"].strip().lower(), request.form["password"],request.form["subject"])
+        data = (request.form["username"].strip().lower(), request.form["password"],request.form["subject"],request.form["email"].strip().lower())
         if data[0] in u_name:
             flash("user exist!")
             return render_template("add_tutor.html")
+        elif len(data[1])<8:
+            flash("Password should be a minimum of eight characters")
+        elif len(data[3].split("@"))<2 or len(data[3].split("@"))>2 or ('@' not in data[3]):
+            flash("Gmail invalid!")
+            return render_template("add_tutor.html")
         elif data[0].strip()=='' or data[1].strip()=='' or data[2].strip()=='':
-            flash("data incomplete!")
+            flash("Form incomplete!")
             return render_template("add_tutor.html")
         else:
-            mydb = mysql.connector.connect(host="harishram2k6.mysql.pythonanywhere-services.com", user="harishram2k6", password="qazxsW#123", database='harishram2k6$attendance',auth_plugin='mysql_native_password')
+            session["data"]=data
+            session["onetimepasswd"]=random.randint(1000,9999)
+            sendmail(data[3],session.get("onetimepasswd"))
+            flash("A OTP has been sent to your mail verify it!")
+            return render_template("verify_otp.html")
+    elif request.method=="POST" and "OTP" in request.form:
+        if not(request.form.get("OTP").isdigit()):
+            flash("OTP Invalid!")
+        elif int(request.form.get("OTP"))!=session.get("onetimepasswd"):
+            flash("OTP Invalid!")
+        else:
+            mydb = mysql.connector.connect(host="necscienceandhumanities.mysql.pythonanywhere-services.com", user="necscienceandhum", password="qazxsW#123", database='necscienceandhum$default',auth_plugin='mysql_native_password')
             cursor = mydb.cursor()
-            data = list(data)
+            data = list(session.get("data"))
             data[1]=generate_password_hash(data[1],method='pbkdf2:sha256',salt_length=8)
-            cursor.execute("INSERT INTO login_data (username,password,subject) VALUES(%s,%s,%s)",data)
+            cursor.execute("INSERT INTO login_data (username,password,subject,mail) VALUES(%s,%s,%s,%s)",tuple(data))
             mydb.commit()
             mydb.close()
-            flash(f"Successfully added {data[0]}!")
+            session.clear()
+            flash(f"Successfully added {session.get('data')[0]}!")
             return render_template("add_tutor.html")
     return render_template("add_tutor.html")
 
@@ -263,15 +339,14 @@ def tutor_add():
 def admin():
     if not("admin_valid" in session):
         return redirect(url_for('login'))
-    for i in os.listdir("/home/harishram2k6/mysite"):
+    for i in os.listdir(os.path.dirname(__file__)):
         if '.csv' in i or '.zip' in i or ".xlsx" in i:
-            os.remove("/home/harishram2k6/mysite/"+i)
+            os.remove(os.path.join(os.path.dirname(__file__), i))
     if request.method=="POST" and ('submit' in request.form):
         data = (request.form["startDate"], request.form["endDate"])
         if not(any(data[0])) or not(any(data[0])):
             return render_template('admin.html',js_code="Date not selected")
-        mydb = mysql.connector.connect(host="harishram2k6.mysql.pythonanywhere-services.com", user="harishram2k6", password="qazxsW#123", database='harishram2k6$attendance',
-        auth_plugin='mysql_native_password')
+        mydb = mysql.connector.connect(host="necscienceandhumanities.mysql.pythonanywhere-services.com", user="necscienceandhum", password="qazxsW#123", database='necscienceandhum$default',auth_plugin='mysql_native_password')
         cursor = mydb.cursor()
         command = "select regno,name,reason,date from admin where date between %s and %s order by sec"
         cursor.execute(command, data)
@@ -283,7 +358,7 @@ def admin():
         if not(any(data[0])) or not(any(data[0])):
             flash("Date not selected")
             return render_template('admin.html')
-        mydb = mysql.connector.connect(host="harishram2k6.mysql.pythonanywhere-services.com",user="harishram2k6",password="qazxsW#123",database = 'harishram2k6$attendance',auth_plugin='mysql_native_password')
+        mydb = mysql.connector.connect(host="necscienceandhumanities.mysql.pythonanywhere-services.com", user="necscienceandhum", password="qazxsW#123", database='necscienceandhum$default',auth_plugin='mysql_native_password')
         cursor = mydb.cursor()
         command = "select regno,name,reason,date,sec from admin where date between %s and %s order by sec"
         cursor.execute(command,data)
@@ -325,7 +400,7 @@ def admin():
         os.remove(path)
         return send_file(f_name, as_attachment=True)
     elif request.method=="POST" and ('monthly-report-download' in request.form):
-        mydb = mysql.connector.connect(host="harishram2k6.mysql.pythonanywhere-services.com", user="harishram2k6", password="qazxsW#123", database='harishram2k6$attendance',auth_plugin='mysql_native_password')
+        mydb = mysql.connector.connect(host="necscienceandhumanities.mysql.pythonanywhere-services.com", user="necscienceandhum", password="qazxsW#123", database='necscienceandhum$default',auth_plugin='mysql_native_password')
         cursor = mydb.cursor()
         hol_path = os.path.join(os.path.dirname(__file__), 'holidays.txt')
         with open(hol_path,"r") as file:
@@ -388,31 +463,30 @@ def tutor(uid):
         h_days = tuple(map(lambda x:x.strip(),file.readlines()))
     if (str(datetime.date.today()) in h_days) or (datetime.date.today().weekday()==6):
         return render_template("closed.html",data="Site Temporarily Suspended For Holiday")
-    mydb = mysql.connector.connect(host="harishram2k6.mysql.pythonanywhere-services.com", user="harishram2k6", password="qazxsW#123", database='harishram2k6$attendance',
-    auth_plugin='mysql_native_password')
+    mydb = mysql.connector.connect(host="necscienceandhumanities.mysql.pythonanywhere-services.com", user="necscienceandhum", password="qazxsW#123", database='necscienceandhum$default',auth_plugin='mysql_native_password')
     cursor = mydb.cursor()
     cursor.execute("SELECT DISTINCT SEC FROM tutor WHERE TUTOR_UID=%s",(uid,))
     tutor_sec = (cursor.fetchone())[0]
     cursor.execute("SELECT NAME,REGNO,DEPARTMENT,SEC FROM tutor WHERE SEC=%s", (tutor_sec,))
     data = cursor.fetchall()
     mydb.close()
+    current_date = datetime.datetime.now()
+    current_date = current_date.strftime('%Y-%m-%d')
     if request.method == "POST":
-        mydb = mysql.connector.connect(host="harishram2k6.mysql.pythonanywhere-services.com", user="harishram2k6", password="qazxsW#123", database='harishram2k6$attendance',
-        auth_plugin='mysql_native_password')
+        mydb = mysql.connector.connect(host="necscienceandhumanities.mysql.pythonanywhere-services.com", user="necscienceandhum", password="qazxsW#123", database='necscienceandhum$default',auth_plugin='mysql_native_password')
         cursor = mydb.cursor()
         selected_checkboxes = request.form.getlist('checkbox')
         # selected_checkboxes --> ['0','1']
         reason = [request.form[i] for i in selected_checkboxes]
         # reason --> ['reason 1','reason 2']
-        current_date = datetime.datetime.now()
-        current_date = current_date.strftime('%Y-%m-%d')
         for i, j in zip(selected_checkboxes, reason):
             val = (data[0][3], data[0][2], data[int(i)][1], j, current_date, data[int(i)][0])
             cursor.execute("INSERT INTO admin (sec,department,regno,reason,date,name) VALUES(%s,%s,%s,%s,%s,%s)", val)
             mydb.commit()
         mydb.close()
         flash("Submitted Successfully!")
-    return render_template("tutor.html", data=data, length=len(data))
+    return render_template("tutor.html", data=data, length=len(data),t_day=current_date)
 
 if __name__ == "__main__":
-    app.run(debug=False)
+    app.run(debug=True)
+
