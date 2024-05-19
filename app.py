@@ -4,7 +4,8 @@ from werkzeug.security import generate_password_hash,check_password_hash
 import mysql.connector, datetime,os,zipfile,smtplib,random
 from datetime import timedelta
 import pandas as pd
-# openpyxl imcluded
+from openpyxl import Workbook
+from openpyxl.styles import Alignment,Font
 
 
 app = Flask(__name__)
@@ -40,9 +41,11 @@ def login():
                 flash("Incorrect password")
                 return render_template('index.html')
             elif check_password_hash(database_data[0][0],data[1]) and data[0]=='admin':
+                session.clear()
                 session["admin_valid"] = True
                 return redirect(url_for('admin'))
             else:
+                session.clear()
                 session[data[0]] = True
                 return redirect(url_for('tutor', uid=data[0]))
         else:
@@ -290,8 +293,6 @@ def submit_form():
 def tutor_add():
     if not("admin_valid" in session):
         return redirect(url_for('login'))
-    if request.method=="POST":
-        print(tuple(request.form))
     if request.method=='POST' and "username" in request.form:
         mydb = mysql.connector.connect(host="necscienceandhumanities.mysql.pythonanywhere-services.com", user="necscienceandhum", password="qazxsW#123", database='necscienceandhum$default',auth_plugin='mysql_native_password')
         cursor = mydb.cursor()
@@ -330,7 +331,6 @@ def tutor_add():
             cursor.execute("INSERT INTO login_data (username,password,subject,mail) VALUES(%s,%s,%s,%s)",tuple(data))
             mydb.commit()
             mydb.close()
-            session.clear()
             flash(f"Successfully added {session.get('data')[0]}!")
             return render_template("add_tutor.html")
     return render_template("add_tutor.html")
@@ -342,10 +342,20 @@ def admin():
     for i in os.listdir(os.path.dirname(__file__)):
         if '.csv' in i or '.zip' in i or ".xlsx" in i:
             os.remove(os.path.join(os.path.dirname(__file__), i))
+    for file in os.listdir(os.path.dirname(__file__)):
+        def is_valid_date(date_str, format='%Y-%m-%d'):
+            try:
+                datetime.datetime.strptime(date_str, format)
+                return True
+            except ValueError:
+                return False
+        if 'txt' in file.split('.') and is_valid_date(file.split('.')[0]) and file.split('.')[0]!=str(datetime.date.today()):
+            os.remove(os.path.join(os.path.dirname(__file__), file))
     if request.method=="POST" and ('submit' in request.form):
         data = (request.form["startDate"], request.form["endDate"])
         if not(any(data[0])) or not(any(data[0])):
-            return render_template('admin.html',js_code="Date not selected")
+            flash("Date not selected")
+            return render_template('admin.html')
         mydb = mysql.connector.connect(host="necscienceandhumanities.mysql.pythonanywhere-services.com", user="necscienceandhum", password="qazxsW#123", database='necscienceandhum$default',auth_plugin='mysql_native_password')
         cursor = mydb.cursor()
         command = "select regno,name,reason,date from admin where date between %s and %s order by sec"
@@ -368,7 +378,7 @@ def admin():
             regno, name, reason, date, student_sec = zip(*[(i[0], i[1], i[2], i[3].strftime("%Y-%m-%d"),i[4]) for i in data])
         except:
             flash("No data available within the given date range")
-            return render_template('admin.html')
+            return render_template("admin.html")
         df_data = {"REGNO":regno,"SECTION":student_sec,"NAME":name,"REASON":reason,"DATE":date}
         df = pd.DataFrame(df_data)
         path = os.path.join(os.path.dirname(__file__), 'data.csv')
@@ -394,14 +404,15 @@ def admin():
                     dep_file.write(line)
             dep_file.close()
             f_name = os.path.join(os.path.dirname(__file__),'department.zip')
+            with open("not_submitted.txt") as file:
+                file.write('\n'.join({"MECH", "ECE_1", "ECE_2", "ECE_3", "CSE_1", "CSE_2", "CSE_3", "EEE", "IT", "CIVIL", "AI&DS"}.difference(set(student_sec))))
             with zipfile.ZipFile(f_name, 'w') as zipf:
                 for file in files_name:
                     zipf.write(file)
+                zipf.write('not_submitted.txt')
         os.remove(path)
         return send_file(f_name, as_attachment=True)
     elif request.method=="POST" and ('monthly-report-download' in request.form):
-        mydb = mysql.connector.connect(host="necscienceandhumanities.mysql.pythonanywhere-services.com", user="necscienceandhum", password="qazxsW#123", database='necscienceandhum$default',auth_plugin='mysql_native_password')
-        cursor = mydb.cursor()
         hol_path = os.path.join(os.path.dirname(__file__), 'holidays.txt')
         with open(hol_path,"r") as file:
             holidays = tuple(map(lambda x:x.strip(),file.readlines()))
@@ -416,37 +427,76 @@ def admin():
                 dates_list.append(current_date)
                 current_date += timedelta(days=1)
             return list(map(str,dates_list))
-        column_name = ','.join(["NAME","REGNO"] + get_dates_current_month()+["PERCENTAGE"])
-        c_name = get_dates_current_month()
-        line = ""
-        cursor.execute("SELECT NAME,REGNO FROM tutor")
-        name_regno = cursor.fetchall()
-        total_working_hours = len(c_name)*8
-        f_path = os.path.join(os.path.dirname(__file__), 'month_data.txt')
-        with open(f_path,"w") as file:
-            file.write(column_name+"\n")
-            for i in name_regno:
-                name = i[0]
-                regno = i[1]
-                line+=(i[0]+','+str(i[1]))
-                date = datetime.date.today()
-                cursor.execute("SELECT date from admin where regno=%s and date between %s and %s",(regno,str(date.replace(day=1)),str(date)))
-                leave_date = cursor.fetchall()
-                leave_date = [str(item[0]) for item in leave_date]
-                for i in range(len(c_name)):
-                    if (c_name[i] in leave_date):
-                        line+=",A"
-                    else:
-                        line+=", "
-                line+=(','+str(100-(float("{:.2f}".format(((len(leave_date)*8)/total_working_hours)*100)))))
-                file.write(line+'\n')
-                line=''
+        def create_excel_file(filename,section):
+            wb = Workbook()
+            sheet = wb.active
+            header_cell = sheet.cell(row=1, column=1)
+            header_cell.value = 'Name'
+            header_cell.alignment = Alignment(horizontal='center')
+            header_cell = sheet.cell(row=1, column=2)
+            header_cell.value = 'Regno'
+            header_cell.alignment = Alignment(horizontal='center')
+            db = mysql.connector.connect(host="necscienceandhumanities.mysql.pythonanywhere-services.com", user="necscienceandhum", password="qazxsW#123", database='necscienceandhum$default',auth_plugin='mysql_native_password')
+            cursor = db.cursor()
+            cursor.execute("select name,regno from tutor where sec=%s",(section,))
+            data = cursor.fetchall()
+            dates = get_dates_current_month()
+            for i in range(len(dates)):
+                start_col = i * 8 + 3
+                end_col = start_col + 7
+                sheet.merge_cells(start_row=1, start_column=start_col, end_row=1, end_column=end_col)
+                header_cell = sheet.cell(row=1, column=start_col)
+                header_cell.value = dates[i]
+                header_cell.alignment = Alignment(horizontal='center')
+            sheet.cell(row=1, column=len(dates)*8+3).value = "Percentage"
+            current_row = 2
+            for name,regno in data:
+                sheet.cell(row=current_row, column=1).value = name
+                sheet.cell(row=current_row, column=2).value = regno
+                cursor.execute("select date,duration from admin where regno=%s and date between %s and %s",(regno,dates[0],dates[-1]))
+                leave_data = {date.strftime("%Y-%m-%d"):duration for date,duration in cursor.fetchall()}
+                date_index = 0
+                minutes = 0
+                for j in range(3,len(dates)*8+3,8):
+                    if dates[date_index] in leave_data.keys():
+                        periods = lambda x:tuple(range(int(x[0]),int(x[1])+1))
+                        periods = periods(leave_data[dates[date_index]])
+                        data = ['A' if i in periods else ' ' for i in range(1,9)]
+                        for i in enumerate(data, start=1):
+                            if i[1]=='A' and (i[0]==7 or i[0]==8):
+                                minutes+=45
+                            elif i[1]=='A':
+                                minutes+=50
+                        for col, val in enumerate(data, start=j):
+                            sheet.cell(row=current_row, column=col).value = val
+                            sheet.cell(row=current_row, column=col).font = Font(color="FF0000")
+                            sheet.cell(row=current_row, column=col).alignment = Alignment(horizontal='center')
+                    date_index+=1
+                percent = "{:.2f}".format(100-(((minutes/60)/(len(dates)*8))*100))
+                if float(percent)<75:
+                    sheet.cell(row=current_row, column=len(dates)*8+3).font = Font(color="FF0000")
+                else:
+                    sheet.cell(row=current_row, column=len(dates)*8+3).font = Font(color="4CBB17")
+                sheet.cell(row=current_row, column=len(dates)*8+3).alignment = Alignment(horizontal='center')
+                sheet.cell(row=current_row, column=len(dates)*8+3).value = percent
+                current_row+=1
+            wb.save(filename)
+            db.close()
+        mydb = mysql.connector.connect(host="necscienceandhumanities.mysql.pythonanywhere-services.com", user="necscienceandhum", password="qazxsW#123", database='necscienceandhum$default',auth_plugin='mysql_native_password')
+        cursor = mydb.cursor()
+        cursor.execute("select distinct sec from tutor")
+        sections = [i[0]+"_month.xlsx" for i in cursor.fetchall()]
         mydb.close()
-        os.rename(f_path,f_path.replace("txt","csv"))
-        if os.path.exists(f_path.replace('txt','csv')):
-            return send_file(f_path.replace('txt','csv'), as_attachment=True)
+        for i in sections:
+            create_excel_file(filename=i,section=i.replace("_month.xlsx",""))
+        with zipfile.ZipFile("month_data.zip", 'w') as zipf:
+            for file in sections:
+                zipf.write(file)
+        if os.path.exists(os.path.abspath(os.path.join(os.getcwd(),"month_data.zip"))):
+            return send_file(os.path.abspath(os.path.join(os.getcwd(),"month_data.zip")), as_attachment=True)
         else:
-            return "Error: month_data.txt not found", 404
+            flash("Error: file not found")
+            return render_template("admin.html")
     else:
         return render_template("admin.html")
 
@@ -463,30 +513,43 @@ def tutor(uid):
         h_days = tuple(map(lambda x:x.strip(),file.readlines()))
     if (str(datetime.date.today()) in h_days) or (datetime.date.today().weekday()==6):
         return render_template("closed.html",data="Site Temporarily Suspended For Holiday")
+    current_date = datetime.datetime.now()
+    current_date = current_date.strftime('%Y-%m-%d')
     mydb = mysql.connector.connect(host="necscienceandhumanities.mysql.pythonanywhere-services.com", user="necscienceandhum", password="qazxsW#123", database='necscienceandhum$default',auth_plugin='mysql_native_password')
     cursor = mydb.cursor()
     cursor.execute("SELECT DISTINCT SEC FROM tutor WHERE TUTOR_UID=%s",(uid,))
     tutor_sec = (cursor.fetchone())[0]
+    try:
+        with open(os.path.join(os.path.dirname(__file__),current_date+".txt"),'r') as file:
+            classes = file.readlines()
+            if tutor_sec+"\n" in classes:
+                return render_template("closed.html",data=f"{tutor_sec} attendance submitted")
+    except:
+        pass
     cursor.execute("SELECT NAME,REGNO,DEPARTMENT,SEC FROM tutor WHERE SEC=%s", (tutor_sec,))
     data = cursor.fetchall()
     mydb.close()
-    current_date = datetime.datetime.now()
-    current_date = current_date.strftime('%Y-%m-%d')
-    if request.method == "POST":
+    if request.method == "POST" and "update" in request.form:
         mydb = mysql.connector.connect(host="necscienceandhumanities.mysql.pythonanywhere-services.com", user="necscienceandhum", password="qazxsW#123", database='necscienceandhum$default',auth_plugin='mysql_native_password')
         cursor = mydb.cursor()
         selected_checkboxes = request.form.getlist('checkbox')
         # selected_checkboxes --> ['0','1']
         reason = [request.form[i] for i in selected_checkboxes]
         # reason --> ['reason 1','reason 2']
-        for i, j in zip(selected_checkboxes, reason):
-            val = (data[0][3], data[0][2], data[int(i)][1], j, current_date, data[int(i)][0])
-            cursor.execute("INSERT INTO admin (sec,department,regno,reason,date,name) VALUES(%s,%s,%s,%s,%s,%s)", val)
+        duration = [request.form.get(f"from_{i}")+request.form.get(f"to_{i}") for i in selected_checkboxes]
+        for i, j, time in zip(selected_checkboxes, reason, duration):
+            val = (data[0][3], data[0][2], data[int(i)][1], j, current_date, data[int(i)][0],time)
+            cursor.execute("INSERT INTO admin (sec,department,regno,reason,date,name,duration) VALUES(%s,%s,%s,%s,%s,%s,%s)", val)
             mydb.commit()
         mydb.close()
+        try:
+            with open(os.path.join(os.path.dirname(__file__),current_date+".txt"),'a') as file:
+                file.write(tutor_sec+"\n")
+        except:
+            with open(os.path.join(os.path.dirname(__file__),current_date+".txt"),'w') as file:
+                file.write(tutor_sec+"\n")
         flash("Submitted Successfully!")
     return render_template("tutor.html", data=data, length=len(data),t_day=current_date)
 
 if __name__ == "__main__":
-    app.run(debug=True)
-
+    app.run(debug=False)
